@@ -21,30 +21,36 @@ num_eval_steps = 1
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
       time1 = time.time()
-      dataset = DatasetSentence(vocab, self.get_query_argument("text"))
-      with sess.as_default():
-        data_iterator = dataset.iterate_once(hps.batch_size * hps.num_gpus, hps.num_steps)
-        tf.initialize_local_variables().run()
-        loss_nom = 0.0
-        loss_den = 0.0
-        for i, (x, y, w) in enumerate(data_iterator):
-            if i >= num_eval_steps:
-                break
-            time1 = time.time()
-            loss = sess.run(model.loss, {model.x: x, model.y: y, model.w: w})
-            time2 = time.time()
-            print('Loss function took %0.3f ms' % ((time2-time1)*1000.0))
-            loss_nom += loss
-            loss_den += w.mean()
-            loss = loss_nom / loss_den
-            sys.stdout.write("%d: %.3f (%.3f) ... " % (i, loss, np.exp(loss)))
-            sys.stdout.flush()
-        sys.stdout.write("\n")
+      text = self.get_arguments("text")
+      results = []
+      for line in text:
+        print(line)
+        dataset = DatasetSentence(vocab, line)
+        with sess.as_default():
+            data_iterator = dataset.iterate_once(hps.batch_size * hps.num_gpus, hps.num_steps)
+            tf.initialize_local_variables().run()
+            loss_nom = 0.0
+            loss_den = 0.0
+            for i, (x, y, w) in enumerate(data_iterator):
+                if i >= num_eval_steps:
+                    break
+                time1 = time.time()
+                loss = sess.run(model.loss, {model.x: x, model.y: y, model.w: w})
+                print(loss)
+                time2 = time.time()
+                print('Loss function took %0.3f ms' % ((time2-time1)*1000.0))
+                loss_nom += loss
+                loss_den += w.mean()
+                loss = loss_nom / loss_den
+                sys.stdout.write("%d: %.3f (%.3f) ... " % (i, loss, np.exp(loss)))
+                sys.stdout.flush()
+            sys.stdout.write("\n")
 
-        log_perplexity = loss_nom / loss_den
-        print("Results: log_perplexity = %.3f perplexity = %.3f nom = %.3f den = %.3f" % (
-            log_perplexity, np.exp(log_perplexity), loss_nom, loss_den))
-      self.write(str(np.exp(log_perplexity)))
+            log_perplexity = loss_nom / loss_den
+            print("Results: log_perplexity = %.3f perplexity = %.3f nom = %.3f den = %.3f" % (
+                log_perplexity, np.exp(log_perplexity), loss_nom, loss_den))
+            results.append(str(np.exp(log_perplexity)))
+      self.write("\n".join(results))
       time2 = time.time()
       print('Request function took %0.3f ms' % ((time2-time1)*1000.0))
 
